@@ -5,6 +5,7 @@
 
 import asyncio
 import json
+import re
 import logging
 import time
 from dataclasses import dataclass
@@ -191,6 +192,7 @@ class GlobalSearch(BaseSearch):
                 search_response = clean_up_json(search_response)
                 try:
                     # parse search response json
+                    log.warn("Search response: %s", search_response)
                     processed_response = self.parse_search_response(search_response)
                 except ValueError:
                     log.exception("Error parsing search response json")
@@ -229,7 +231,21 @@ class GlobalSearch(BaseSearch):
         list[dict[str, Any]]
             A list of key points, each key point is a dictionary with "answer" and "score" keys
         """
-        parsed_elements = json.loads(search_response)["points"]
+        try:
+            json_match = re.search(r'{.*}', search_response, re.DOTALL)
+            if not json_match:
+                raise ValueError("No JSON object found in the response")
+
+            json_str = json_match.group()
+            parsed_json = json.loads(json_str)
+        except json.JSONDecodeError as e:
+            print("JSON decode error:", e)
+            print("Failed to parse JSON string:", json_str)
+            return None
+        except ValueError as e:
+            print("Value error:", e)
+            return None
+        parsed_elements = parsed_json["points"]
         return [
             {
                 "answer": element["description"],
